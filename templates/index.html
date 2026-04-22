@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Deepfake Video Detection</title>
+    <script src="https://unpkg.com/dropzone@5/dist/min/dropzone.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/dropzone@5/dist/min/dropzone.min.css"
+    />
+    <style>
+      :root {
+        --bg-color: #1a1a1a;
+        --text-color: #f0f0f0;
+        --card-bg: #2d2d2d;
+        --accent-color: #4a6bff;
+        --danger-color: #ff4a4a;
+        --success-color: #4aff6b;
+      }
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+      }
+      .header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .dropzone {
+        border: 2px dashed var(--accent-color);
+        border-radius: 5px;
+        background: var(--card-bg);
+        min-height: 200px;
+        padding: 20px;
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      .dropzone .dz-message {
+        font-size: 1.5em;
+        color: var(--text-color);
+        opacity: 0.8;
+      }
+      .dropzone .dz-message .note {
+        font-size: 0.8em;
+        opacity: 0.6;
+      }
+      .upload-btn {
+        display: block;
+        width: 200px;
+        margin: 20px auto 20px;
+        padding: 10px;
+        background-color: var(--accent-color);
+        color: white;
+        border: none;
+        border-radius: 5px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+      .upload-btn:hover {
+        background-color: #3a5ae8;
+      }
+      .upload-btn:disabled {
+        background-color: #555;
+        cursor: not-allowed;
+      }
+      .results {
+        margin-top: 30px;
+        padding: 20px;
+        border-radius: 5px;
+        background-color: var(--card-bg);
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        display: none;
+      }
+      .result-header {
+        font-size: 1.2em;
+        margin-bottom: 15px;
+        color: var(--text-color);
+      }
+      .result-content {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .result-item {
+        display: flex;
+        justify-content: space-between;
+      }
+      .result-label {
+        font-weight: bold;
+      }
+      .fake-result {
+        color: var(--danger-color);
+        font-weight: bold;
+        font-size: 1.3em;
+      }
+      .real-result {
+        color: var(--success-color);
+        font-weight: bold;
+        font-size: 1.3em;
+      }
+      .progress-container {
+        width: 100%;
+        background-color: #333;
+        border-radius: 5px;
+        margin: 10px 0;
+        display: none;
+      }
+      .progress-bar {
+        height: 10px;
+        background-color: var(--accent-color);
+        border-radius: 5px;
+        width: 0%;
+        transition: width 0.3s;
+      }
+      .video-preview {
+        max-width: 100%;
+        margin-top: 20px;
+        display: none;
+        border-radius: 5px;
+      }
+      .dropzone .dz-preview.dz-error .dz-error-message {
+        display: none;
+      }
+      .dropzone .dz-preview .dz-progress {
+        display: none;
+      }
+      .frame-gallery {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 20px;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+      .frame-container {
+        position: relative;
+        width: 150px;
+      }
+      .frame-container img {
+        width: 100%;
+        border-radius: 4px;
+        border: 1px solid #ddd;
+      }
+      .frame-number {
+        position: absolute;
+        top: 5px;
+        left: 5px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 2px 5px;
+        border-radius: 3px;
+        font-size: 12px;
+      }
+      .footer {
+        margin-top: 14rem;
+        padding: 20px 0;
+        text-align: center;
+        color: #6c757d;
+        border-top: 1px solid var(--card-bg);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Deepfake Video Detection</h1>
+      <p>Upload a video to check if it's authentic or manipulated</p>
+    </div>
+
+    <form action="/upload" class="dropzone" id="videoDropzone">
+      <div class="dz-message">
+        Drag & Drop video here or click to browse<br />
+        <span class="note">(Supports MP4, MOV, AVI formats)</span>
+      </div>
+    </form>
+
+    <video controls class="video-preview" id="videoPreview"></video>
+
+    <button id="uploadBtn" class="upload-btn" disabled>Detect Deepfake</button>
+
+    <div class="progress-container" id="progressContainer">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="results" id="results">
+      <div class="result-header">Analysis Results</div>
+      <div class="result-item">
+        <span class="result-label">Processed Frames:</span>
+        <div id="frameCount">0 frames analyzed</div>
+      </div>
+      <div class="frame-gallery" id="frameGallery"></div>
+      <div class="result-content">
+        <div class="result-item">
+          <span class="result-label">Status:</span>
+          <span id="resultStatus">Processing...</span>
+        </div>
+        <div class="result-item">
+          <span class="result-label">Probability of being FAKE:</span>
+          <span id="fakeProbability">0%</span>
+        </div>
+        <div class="result-item">
+          <span class="result-label">Final Verdict:</span>
+          <span id="finalVerdict">-</span>
+        </div>
+      </div>
+    </div>
+
+    <footer class="footer">
+      CV project
+    </footer>
+
+    <script>
+      // Initialize Dropzone
+      Dropzone.autoDiscover = false;
+      const myDropzone = new Dropzone("#videoDropzone", {
+        url: "/upload",
+        paramName: "video",
+        maxFiles: 1,
+        acceptedFiles: "video/mp4,video/quicktime,video/x-msvideo",
+        addRemoveLinks: true,
+        dictDefaultMessage: "Drop video here or click to browse",
+        dictRemoveFile: "Remove",
+        dictMaxFilesExceeded: "You can only upload 1 video at a time",
+        autoProcessQueue: false, // Manual upload control
+        init: function () {
+          this.on("addedfile", function (file) {
+            // Remove previous file if exists
+            if (this.files.length > 1) {
+              this.removeFile(this.files[0]);
+            }
+            document.getElementById("uploadBtn").disabled = false;
+            // Show video preview
+            const videoPreview = document.getElementById("videoPreview");
+            videoPreview.src = URL.createObjectURL(file);
+            videoPreview.style.display = "block";
+            // Hide previous results
+            document.getElementById("results").style.display = "none";
+          });
+          this.on("removedfile", function () {
+            document.getElementById("uploadBtn").disabled = true;
+            document.getElementById("videoPreview").style.display = "none";
+            document.getElementById("videoPreview").src = "";
+
+            document.getElementById("resultStatus").textContent = "";
+            document.getElementById("fakeProbability").textContent = "";
+            document.getElementById("finalVerdict").textContent = "";
+            document.getElementById("results").style.display = "none";
+            document.getElementById("frameGallery").innerHTML = ""
+          });
+
+          this.on("error", function (file, message) {
+            alert("Error: " + message);
+            this.removeFile(file);
+          });
+        },
+      });
+
+      // Handle upload button click
+      document
+        .getElementById("uploadBtn")
+        .addEventListener("click", async function (e) {
+          e.preventDefault();
+
+          if (myDropzone.files.length === 0) {
+            alert("Please select a video first");
+            return;
+          }
+
+          const progressContainer =
+            document.getElementById("progressContainer");
+          const progressBar = document.getElementById("progressBar");
+          const resultsDiv = document.getElementById("results");
+
+          // Show progress bar
+          progressContainer.style.display = "block";
+          progressBar.style.width = "0%";
+
+          try {
+            // Simulate upload progress (replace with actual upload progress)
+            for (let i = 0; i <= 100; i += 5) {
+              await new Promise((resolve) => setTimeout(resolve, 100));
+              progressBar.style.width = `${i}%`;
+            }
+
+            // Here you would actually send the file to your Flask backend
+            const formData = new FormData();
+            formData.append("video", myDropzone.files[0]);
+
+            const response = await fetch("/predict", {
+              method: "POST",
+              body: formData,
+            });
+
+            const data = await response.json();
+            console.log(data);
+
+            // Display results
+            document.getElementById(
+              "fakeProbability"
+            ).textContent = `${Math.round(data.average_prediction * 100)} %`;
+
+            const verdictElement = document.getElementById("finalVerdict");
+
+            // 'FAKE' if prediction > 0.5 else 'REAL'
+            if (data.classification === 1) {
+              verdictElement.textContent = "FAKE (Manipulated)",
+              verdictElement.className = "fake-result";
+            } else {
+              verdictElement.textContent = "REAL (Authentic)";
+              verdictElement.className = "real-result";
+            }
+
+            // Display frames
+            const frameGallery = document.getElementById("frameGallery");
+            const frameCount = document.getElementById("frameCount");
+            frameGallery.innerHTML = "";
+            frameCount.textContent = `${data.images.length} frames analyzed`;
+
+            if (data.images && data.images.length > 0) {
+              data.images.forEach((frameData, index) => {
+                const frameContainer = document.createElement("div");
+                frameContainer.className = "frame-container";
+                frameContainer.innerHTML = `
+                <img src="data:image/jpeg;base64,${frameData}" alt="Frame ${
+                  index + 1
+                }">
+                <div class="frame-number">${index + 1}</div>
+            `;
+                frameGallery.appendChild(frameContainer);
+              });
+            } else {
+              frameGallery.innerHTML = "<p>No frames available</p>";
+            }
+            document.getElementById("resultStatus").textContent =
+              "Analysis Complete";
+            resultsDiv.style.display = "block";
+          } catch (error) {
+            console.error("Error:", error);
+            document.getElementById("resultStatus").textContent =
+              "Error during analysis";
+            resultsDiv.style.display = "block";
+          } finally {
+            progressContainer.style.display = "none";
+          }
+        });
+    </script>
+  </body>
+</html>
+
+

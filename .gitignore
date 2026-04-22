@@ -1,0 +1,10 @@
+/dataset
+/uploads
+/.env
+/.env.local
+/processed_images
+venv/
+__pycache__/
+*.pyc
+processed_images/
+uploads/
